@@ -67,7 +67,7 @@
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-// import api from '../api';
+import api from '../api';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -88,16 +88,11 @@ async function handleSubmit() {
   
   try {
     if (isLogin.value) {
-      // Simulate API call for login
-      // const res = await api.post('/api/auth/login', { username: form.username, password: form.password });
-      // authStore.setToken(res.data.access_token);
-      
-      // Temporary mock token for skeleton
-      authStore.setToken('mock-jwt-token-scholarmind');
+      const res = await api.post('/api/auth/login', { username: form.username, password: form.password });
+      authStore.setToken(res.data.access_token);
       router.push('/library');
     } else {
-      // Simulate API call for register
-      // await api.post('/api/auth/register', form);
+      await api.post('/api/auth/register', { username: form.username, email: form.email, password: form.password });
       isLogin.value = true;
       errorMsg.value = '注册成功，请使用新账号登录！';
     }

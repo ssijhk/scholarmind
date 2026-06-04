@@ -3,25 +3,36 @@ from typing import Optional, List
 from datetime import datetime
 
 class QueryLogResponse(BaseModel):
-    id: int
-    user_id: int
+    id: str
+    user_id: Optional[str] = None
     question: str
-    answer_snippet: str
-    latency_ms: int
-    tokens_used: int
-    created_at: datetime
+    rewritten_query: Optional[str] = None
+    latency_ms: Optional[int] = None
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    retrieved_chunk_ids: Optional[List[int]] = None
+    feedback: Optional[int] = None
+    created_at: Optional[datetime] = None
 
 class AccessLogResponse(BaseModel):
-    id: int
-    user_id: Optional[int] = None
+    id: str
+    user_id: Optional[str] = None
     path: str
     method: str
     status_code: int
-    ip_address: str
-    created_at: datetime
+    ip_address: Optional[str] = None
+    created_at: Optional[datetime] = None
 
 class StatsOverviewResponse(BaseModel):
     paper_count: int
     chunk_count: int
     total_queries: int
     average_latency_ms: float
+
+class IngestTaskResponse(BaseModel):
+    id: str
+    file_name: str
+    stage: str
+    progress: int = 0
+    error_msg: Optional[str] = None
+    started_at: Optional[datetime] = None

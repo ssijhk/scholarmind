@@ -35,19 +35,19 @@
         <div class="metrics-grid">
           <div class="metric-card">
             <span class="metric-title">📁 知识库文档数</span>
-            <div class="metric-val">12 <span class="sub">篇</span></div>
+            <div class="metric-val">{{ stats.paper_count }} <span class="sub">篇</span></div>
           </div>
           <div class="metric-card">
             <span class="metric-title">🧩 已构建向量分块</span>
-            <div class="metric-val">3,248 <span class="sub">个</span></div>
+            <div class="metric-val">{{ stats.chunk_count.toLocaleString() }} <span class="sub">个</span></div>
           </div>
           <div class="metric-card">
             <span class="metric-title">⚡ 平均问答延迟</span>
-            <div class="metric-val">420 <span class="sub">ms</span></div>
+            <div class="metric-val">{{ Math.round(stats.average_latency_ms) }} <span class="sub">ms</span></div>
           </div>
           <div class="metric-card">
-            <span class="metric-title">💾 Redis 缓存命中率</span>
-            <div class="metric-val">78.5 <span class="sub">%</span></div>
+            <span class="metric-title">📊 历史查询总数</span>
+            <div class="metric-val">{{ stats.total_queries.toLocaleString() }} <span class="sub">次</span></div>
           </div>
         </div>
 
@@ -117,62 +117,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import api from '../api';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
+interface Stats { paper_count: number; chunk_count: number; total_queries: number; average_latency_ms: number }
+interface Task { id: string; file_name: string; stage: string; progress: number; error_msg: string | null; started_at: string | null }
+interface QueryLog { id: number; question: string; rewritten_query: string | null; latency_ms: number | null; prompt_tokens: number | null; completion_tokens: number | null; retrieved_chunk_ids: number[] | null; feedback: number | null }
+
+const stats = ref<Stats>({ paper_count: 0, chunk_count: 0, total_queries: 0, average_latency_ms: 0 });
+const activeTasks = ref<Task[]>([]);
+const queryLogs = ref<QueryLog[]>([]);
+
 const stageMap: Record<string, string> = {
-  queued: '排队中',
-  parsing: '版面解析中 (MinerU/GROBID)',
-  indexing: '向量索引构建中',
-  done: '处理完毕',
-  failed: '任务失败',
+  queued: '排队中', parsing: '版面解析中 (MinerU/GROBID)', indexing: '向量索引构建中',
+  pending: '排队中', done: '处理完毕', failed: '任务失败',
 };
 
-const activeTasks = ref([
-  {
-    id: 1,
-    file_name: 'Retrieval-Augmented Generation for NLP Tasks.pdf',
-    stage: 'parsing',
-    progress: 45,
-    started_at: '2026-06-03 21:20:00',
-    error_msg: null,
-  },
-  {
-    id: 2,
-    file_name: 'BGE M3 Embedding Model Paper.pdf',
-    stage: 'queued',
-    progress: 0,
-    started_at: '2026-06-03 21:28:10',
-    error_msg: null,
-  },
-]);
-
-const queryLogs = ref([
-  {
-    id: 101,
-    question: 'Transformer的多头注意力是什么作用？',
-    rewritten_query: 'Transformer multi-head attention mechanism function and purpose',
-    latency_ms: 380,
-    prompt_tokens: 1540,
-    completion_tokens: 320,
-    retrieved_chunk_ids: [12, 15, 23],
-    feedback: 1,
-  },
-  {
-    id: 102,
-    question: '混合检索在 Milvus 里面怎么弄？',
-    rewritten_query: 'How to implement hybrid dense and sparse search in Milvus vector database',
-    latency_ms: 450,
-    prompt_tokens: 1820,
-    completion_tokens: 280,
-    retrieved_chunk_ids: [48, 51],
-    feedback: undefined,
-  },
-]);
+onMounted(async () => {
+  try { const r = await api.get('/api/stats/overview'); stats.value = r.data; } catch {}
+  try { const r = await api.get('/api/tasks'); activeTasks.value = r.data; } catch {}
+  try { const r = await api.get('/api/logs/queries'); queryLogs.value = r.data; } catch {}
+});
 
 function handleLogout() {
   authStore.clearAuth();

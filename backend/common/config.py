@@ -20,23 +20,23 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 4096
 
     # Embedding
-    EMBEDDING_PROVIDER: str = "local"
-    EMBEDDING_MODEL: str = "qwen3-embedding"
-    EMBEDDING_BASE_URL: Optional[str] = "http://embedding:80/v1"
-    EMBEDDING_API_KEY: Optional[str] = ""
-    EMBEDDING_DIM: int = 1024
+    EMBEDDING_PROVIDER: str = "dashscope"
+    EMBEDDING_MODEL: str = "text-embedding-v1"
+    EMBEDDING_BASE_URL: Optional[str] = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    EMBEDDING_API_KEY: Optional[str] = "sk-xxxxxxxx"
+    EMBEDDING_DIM: int = 1536
     EMBEDDING_BATCH: int = 32
-    # local_path mode parameters
+    # local_path mode parameters (unused when provider=dashscope)
     EMBEDDING_MODEL_PATH: Optional[str] = "/models/bge-m3"
     EMBEDDING_DEVICE: str = "cpu"
 
     # Rerank
-    RERANK_PROVIDER: str = "local"
-    RERANK_MODEL: str = "qwen3-reranker"
-    RERANK_BASE_URL: Optional[str] = "http://reranker:80/rerank"
-    RERANK_API_KEY: Optional[str] = ""
+    RERANK_PROVIDER: str = "dashscope"
+    RERANK_MODEL: str = "text-rerank-v2"
+    RERANK_BASE_URL: Optional[str] = "https://dashscope.aliyuncs.com/api/text/rerank"
+    RERANK_API_KEY: Optional[str] = "sk-xxxxxxxx"
     RERANK_TOP_N: int = 5
-    # local_path mode parameters
+    # local_path mode parameters (unused when provider=dashscope)
     RERANK_MODEL_PATH: Optional[str] = "/models/bge-reranker-v2-m3"
     RERANK_DEVICE: str = "cpu"
 
@@ -80,7 +80,8 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False
 
     # Ingestion APIs
-    MINERU_BASE_URL: str = "http://mineru:8000"
+    MINERU_BASE_URL: str = "https://mineru.net/api/kie"
+    MINERU_PIPELINE_ID: str = ""
     GROBID_BASE_URL: str = "http://grobid:8070"
 
     # Retrieval

@@ -174,37 +174,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import api from '../api';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 interface Paper {
-  id: number;
+  id: string;
   title: string;
   authors: string[];
   year?: number;
   status: string;
+  chunk_count?: number;
   created_at: string;
+}
+
+interface Folder {
+  id: string;
+  name: string;
+  paper_count?: number;
 }
 
 const isDragging = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 const searchQuery = ref('');
-const selectedFolderId = ref<number | null>(null);
+const selectedFolderId = ref<string | null>(null);
 
 const showCreateFolderModal = ref(false);
 const newFolderName = ref('');
 const newFolderInputRef = ref<HTMLInputElement | null>(null);
 
 const confirmModal = ref({
-  show: false,
-  title: '',
-  message: '',
-  onConfirm: null as (() => void) | null
-});
+    show: false,
+    title: '',
+    message: '',
+    onConfirm: null as (() => Promise<void> | void) | null
+  });
 
 function triggerFileSelect() {
   fileInput.value?.click();
@@ -218,30 +226,23 @@ const statusMap: Record<string, string> = {
   failed: '失败',
 };
 
-const folders = ref([
-  { id: 1, name: '大语言模型 (LLM)' },
-  { id: 2, name: '多模态与 VLM' },
-  { id: 3, name: 'RAG 检索增强生成' },
-]);
+const folders = ref<Folder[]>([]);
+const papers = ref<Paper[]>([]);
 
-const papers = ref<Paper[]>([
-  {
-    id: 1,
-    title: 'Attention Is All You Need',
-    authors: ['Vaswani et al.'],
-    year: 2017,
-    status: 'done',
-    created_at: '2026-06-03 10:00:00',
-  },
-  {
-    id: 2,
-    title: 'Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks',
-    authors: ['Lewis et al.'],
-    year: 2020,
-    status: 'parsing',
-    created_at: '2026-06-03 12:30:00',
-  },
-]);
+onMounted(async () => {
+  await loadFolders();
+  await loadPapers();
+});
+
+async function loadFolders() {
+  try { const res = await api.get('/api/folders/'); folders.value = res.data; } catch {}
+}
+async function loadPapers() {
+  try {
+    const res = await api.get('/api/papers/');
+    papers.value = res.data.map((p: any) => ({ ...p, authors: p.authors ? (Array.isArray(p.authors) ? p.authors : [p.authors]) : [] }));
+  } catch {}
+}
 
 const filteredPapers = computed(() => {
   return papers.value.filter(paper => {
@@ -263,27 +264,27 @@ async function createFolder() {
   newFolderInputRef.value?.focus();
 }
 
-function submitCreateFolder() {
+async function submitCreateFolder() {
   const name = newFolderName.value.trim();
   if (name) {
-    folders.value.push({
-      id: Date.now(),
-      name: name,
-    });
+    try {
+      await api.post('/api/folders/', { name });
+      await loadFolders();
+    } catch {}
     showCreateFolderModal.value = false;
   }
 }
 
-function confirmDeleteFolder(folder: { id: number; name: string }) {
+function confirmDeleteFolder(folder: { id: string; name: string }) {
   confirmModal.value = {
     show: true,
     title: "🗑️ 删除文献文件夹",
-    message: `确定要删除文件夹 "${folder.name}" 吗？删除该文件夹不会删除其中的文献，文献将被归类到未分类中。`,
-    onConfirm: () => {
-      folders.value = folders.value.filter(f => f.id !== folder.id);
-      if (selectedFolderId.value === folder.id) {
-        selectedFolderId.value = null;
-      }
+    message: `确定要删除文件夹 "${folder.name}" 吗？`,
+    onConfirm: async () => {
+      try {
+        await api.delete(`/api/folders/${folder.id}`);
+        await loadFolders();
+      } catch {}
     }
   };
 }
@@ -303,35 +304,37 @@ function handleFileSelect(e: Event) {
   }
 }
 
-function uploadFiles(files: FileList) {
+async function uploadFiles(files: FileList) {
+  const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    papers.value.push({
-      id: Date.now() + i,
-      title: file.name.replace('.pdf', ''),
-      authors: ['待解析'],
-      year: undefined,
-      status: 'pending',
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    });
+    formData.append('files', files[i]);
   }
+  try {
+    await api.post('/api/papers/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    await loadPapers();
+  } catch {}
 }
 
 // Use custom modal for delete confirmation
-function deletePaper(id: number) {
+function deletePaper(id: string) {
   confirmModal.value = {
     show: true,
     title: "🗑️ 删除文献",
     message: "确认删除此文献吗？其对应的向量与解析内容均将被彻底清理，不可恢复。",
-    onConfirm: () => {
-      papers.value = papers.value.filter(p => p.id !== id);
+    onConfirm: async () => {
+      try {
+        await api.delete(`/api/papers/${id}`);
+        await loadPapers();
+      } catch {}
     }
   };
 }
 
-function closeConfirmModal(isConfirmed: boolean) {
+async function closeConfirmModal(isConfirmed: boolean) {
   if (isConfirmed && confirmModal.value.onConfirm) {
-    confirmModal.value.onConfirm();
+    await confirmModal.value.onConfirm();
   }
   confirmModal.value.show = false;
 }

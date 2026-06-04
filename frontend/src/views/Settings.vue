@@ -168,9 +168,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import api from '../api';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -178,23 +179,20 @@ const authStore = useAuthStore();
 const saving = ref(false);
 
 const config = reactive({
-  LLM_PROVIDER: 'qwen',
-  LLM_MODEL: 'qwen3.7-max',
-  EMBEDDING_PROVIDER: 'local',
-  EMBEDDING_DIM: 1024,
-  
-  // Toggles
-  ENABLE_INTENT_ROUTER: true,
-  ENABLE_QUERY_REWRITE: true,
-  ENABLE_MULTI_QUERY: false,
-  ENABLE_HYDE: true,
-  ENABLE_QUERY_TRANSLATION: true,
-  ENABLE_RERANK: true,
-  ENABLE_CORRECTIVE_RAG: false,
-  ENABLE_SELF_RAG_REFLECT: false,
+  LLM_PROVIDER: 'qwen', LLM_MODEL: 'qwen3.7-max',
+  EMBEDDING_PROVIDER: 'local', EMBEDDING_DIM: 1024,
+  ENABLE_INTENT_ROUTER: true, ENABLE_QUERY_REWRITE: true,
+  ENABLE_MULTI_QUERY: false, ENABLE_HYDE: true,
+  ENABLE_QUERY_TRANSLATION: true, ENABLE_RERANK: true,
+  ENABLE_CORRECTIVE_RAG: false, ENABLE_SELF_RAG_REFLECT: false,
+  RETRIEVAL_TOP_K: 20, HYBRID_DENSE_WEIGHT: 0.6,
+});
 
-  RETRIEVAL_TOP_K: 20,
-  HYBRID_DENSE_WEIGHT: 0.6,
+onMounted(async () => {
+  try {
+    const r = await api.get('/api/settings/rag');
+    Object.assign(config, r.data);
+  } catch {}
 });
 
 function handleLogout() {
@@ -204,11 +202,10 @@ function handleLogout() {
 
 async function saveSettings() {
   saving.value = true;
-  // Simulate API save
-  setTimeout(() => {
-    saving.value = false;
-    alert('全局 RAG 策略与模型参数已保存，修改即刻对后续查询生效！');
-  }, 800);
+  try {
+    await api.put('/api/settings/rag', config);
+  } catch {}
+  saving.value = false;
 }
 </script>
 

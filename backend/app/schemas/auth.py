@@ -15,7 +15,7 @@ class Token(BaseModel):
     token_type: str
 
 class UserMe(BaseModel):
-    id: int
+    id: str
     username: str
     email: str
     role: str = "user"

@@ -86,21 +86,21 @@ services:
     container_name: sm_grobid
     ports: ["8070:8070"]
 
-  # ---------- Embedding 推理 (TEI;用云API则注释掉) ----------
-  embedding:
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
-    container_name: sm_embedding
-    command: ["--model-id", "BAAI/bge-m3"]   # 换 Qwen3-Embedding 改这里
-    ports: ["8080:80"]
-    volumes: ["./data/models:/data"]
+  # ---------- Embedding 推理 (已禁用，改用 DashScope 云 API) ----------
+  # embedding:
+  #   image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+  #   container_name: sm_embedding
+  #   command: ["--model-id", "BAAI/bge-m3"]
+  #   ports: ["8080:80"]
+  #   volumes: ["./data/models:/data"]
 
-  # ---------- Reranker 推理 (TEI) ----------
-  reranker:
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
-    container_name: sm_reranker
-    command: ["--model-id", "BAAI/bge-reranker-v2-m3"]  # 换 Qwen3-Reranker 改这里
-    ports: ["8081:80"]
-    volumes: ["./data/models:/data"]
+  # ---------- Reranker 推理 (已禁用，改用 DashScope 云 API) ----------
+  # reranker:
+  #   image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+  #   container_name: sm_reranker
+  #   command: ["--model-id", "BAAI/bge-reranker-v2-m3"]
+  #   ports: ["8081:80"]
+  #   volumes: ["./data/models:/data"]
 
   # ---------- 后端 API ----------
   backend:
@@ -109,10 +109,17 @@ services:
     env_file: [./backend/.env]
     environment:
       - MYSQL_PORT=3306
+    dns:
+      - 114.114.114.114
+      - 8.8.8.8
     ports: ["8008:8000"]
+    extra_hosts:
+      - "dashscope.aliyuncs.com:39.96.213.166"
+    entrypoint: []
     volumes:
       - ./backend:/app
-      - D:/your/models:/models
+      - ./prompts:/prompts
+      - ./data/models:/models
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     depends_on: [mysql, postgres, redis, minio, milvus]
 
@@ -123,9 +130,16 @@ services:
     env_file: [./backend/.env]
     environment:
       - MYSQL_PORT=3306
+    dns:
+      - 114.114.114.114
+      - 8.8.8.8
+    extra_hosts:
+      - "dashscope.aliyuncs.com:39.96.213.166"
+    entrypoint: []
     volumes:
       - ./backend:/app
-      - D:/your/models:/models
+      - ./prompts:/prompts
+      - ./data/models:/models
     command: ["python", "-m", "app.worker.main"]   # 启动 RQ worker
     depends_on: [redis, mysql, milvus, minio, grobid]
 

@@ -37,6 +37,7 @@
 
         <!-- Message List -->
         <div class="message-list" ref="messageListRef">
+          <div v-if="errorMsg" class="error-banner">{{ errorMsg }}</div>
           <div 
             v-for="msg in messages" 
             :key="msg.id" 
@@ -125,10 +126,14 @@
 
               <!-- Figure Block -->
               <div v-else-if="activeCitation.chunk_type === 'figure'" class="image-viewer">
-                <div class="mock-image">
-                  🖼️ [图表 Key: {{ activeCitation.image_key }}]
-                  <p class="img-caption">{{ activeCitation.content }}</p>
-                </div>
+                <img 
+                  v-if="activeCitation.image_key"
+                  :src="`${apiBase}/api/files/figures/${activeCitation.image_key}`"
+                  class="figure-img"
+                  @error="$event.target.style.display='none'"
+                  alt="Figure"
+                />
+                <p class="img-caption">{{ activeCitation.content }}</p>
               </div>
 
               <!-- Formula Block -->
@@ -173,13 +178,16 @@ interface Message {
 
 const router = useRouter();
 const authStore = useAuthStore();
+const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8008';
 
 const inputQuery = ref('');
 const streaming = ref(false);
 const streamingText = ref('');
 const messageListRef = ref<HTMLDivElement | null>(null);
 
+const conversationId = ref<string>('');
 const activeCitation = ref<any>(null);
+const errorMsg = ref('');
 
 const blockTypeMap: Record<string, string> = {
   text: '段落文本',
@@ -212,7 +220,6 @@ async function sendMessage() {
   const userText = inputQuery.value;
   inputQuery.value = '';
 
-  // 1. Add User Message
   messages.value.push({
     id: Date.now(),
     role: 'user',
@@ -222,52 +229,96 @@ async function sendMessage() {
 
   await scrollToBottom();
 
-  // 2. Mock SSE Response Streaming
   streaming.value = true;
   streamingText.value = '';
+  const currentCitations: any[] = [];
 
-  const mockResponse = `根据先前有关 RAG 的研究 <strong>Attention Is All You Need</strong> [1] 中提出的 Transformer 架构，多头注意力机制大大增强了序列特征的建模能力。对于多文档及复杂对比任务，通常结合混合检索 [2] 能够召回更精准的信息。`;
-  
-  const mockCitations = [
-    {
-      paper_title: 'Attention Is All You Need',
-      page_num: 3,
-      bbox: '[3, 100, 200, 500, 300]',
-      chunk_type: 'text',
-      content: 'We propose the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output.',
-    },
-    {
-      paper_title: 'Retrieval-Augmented Generation for NLP Tasks',
-      page_num: 5,
-      bbox: '[5, 50, 80, 480, 220]',
-      chunk_type: 'table',
-      image_key: 'fig_dataset_comparison',
-      content: '<table border="1" class="mock-table"><tr><th>Model</th><th>Accuracy</th></tr><tr><td>Dense Retrieve</td><td>44.2%</td></tr><tr><td>Hybrid (RRF)</td><td>51.8%</td></tr></table>',
-    },
-  ];
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8008'}/api/chat/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        conversation_id: conversationId.value,
+        question: userText,
+      }),
+    });
 
-  let currentIdx = 0;
-  const interval = setInterval(async () => {
-    if (currentIdx < mockResponse.length) {
-      // Stream characters or tokens
-      streamingText.value += mockResponse.charAt(currentIdx);
-      currentIdx++;
-      await scrollToBottom();
-    } else {
-      clearInterval(interval);
-      streaming.value = false;
-      
-      // Save final message
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = '';
+
+      for (const line of parts) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          const jsonStr = line.slice(6);
+          try {
+            const data = JSON.parse(jsonStr);
+            if (currentEvent === 'token') {
+              streamingText.value += data.delta || '';
+              await scrollToBottom();
+            } else if (currentEvent === 'cite') {
+              currentCitations.push(data);
+            } else if (currentEvent === 'done') {
+              // done signal
+            } else if (currentEvent === 'error') {
+              errorMsg.value = data.error || '未知错误';
+            }
+          } catch {
+            // non-JSON data line, ignore
+          }
+          currentEvent = '';
+        } else if (line.trim() === '') {
+          currentEvent = '';
+        } else {
+          // continuation of previous event or incomplete line
+          buffer = line;
+        }
+      }
+    }
+
+    streaming.value = false;
+    if (streamingText.value) {
       messages.value.push({
         id: Date.now() + 1,
         role: 'assistant',
         content: streamingText.value,
-        citations: mockCitations,
+        citations: currentCitations,
       });
-      streamingText.value = '';
-      await scrollToBottom();
     }
-  }, 15);
+    streamingText.value = '';
+    await scrollToBottom();
+  } catch (error: any) {
+    streaming.value = false;
+    streamingText.value = '';
+    console.error('Chat error:', error);
+    errorMsg.value = '请求失败：' + (error.message || '网络错误');
+    messages.value.push({
+      id: Date.now() + 1,
+      role: 'assistant',
+      content: '抱歉，服务暂时不可用：' + (error.message || '请稍后重试'),
+      citations: [],
+    });
+  }
 }
 
 async function scrollToBottom() {
@@ -403,6 +454,15 @@ async function scrollToBottom() {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.error-banner {
+  padding: 10px 16px;
+  background: #fed7d7;
+  color: #9b2c2c;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .message-item {
@@ -671,13 +731,11 @@ async function scrollToBottom() {
   text-align: left;
 }
 
-.image-viewer .mock-image {
-  background-color: #edf2f0;
-  border: 1px dashed #b8c7be;
-  padding: 30px 10px;
-  text-align: center;
-  border-radius: 6px;
-  font-weight: 600;
+.figure-img {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e1e6e3;
+  margin-bottom: 10px;
 }
 
 .img-caption {

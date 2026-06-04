@@ -4,19 +4,19 @@ from datetime import datetime
 
 class ConversationCreate(BaseModel):
     title: Optional[str] = None
-    folder_id: Optional[int] = None
-    paper_ids: Optional[List[int]] = None
+    folder_id: Optional[str] = None
+    paper_ids: Optional[List[str]] = None
 
 class ConversationResponse(BaseModel):
-    id: int
+    id: str
     title: str
-    folder_id: Optional[int] = None
-    paper_ids: Optional[List[int]] = None
-    created_at: datetime
-    updated_at: datetime
+    folder_id: Optional[str] = None
+    paper_ids: Optional[List[str]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class CitationResponse(BaseModel):
-    paper_id: int
+    paper_id: str
     paper_title: str
     page_num: int
     bbox: str
@@ -26,18 +26,18 @@ class CitationResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     id: int
-    conversation_id: int
+    conversation_id: str
     role: str  # "user", "assistant"
     content: str
     citations: Optional[List[CitationResponse]] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
 class ChatQueryRequest(BaseModel):
     question: str
-    conversation_id: int
+    conversation_id: str = ""
     scope_type: str = "all"  # "all", "folder", "papers"
-    folder_id: Optional[int] = None
-    paper_ids: Optional[List[int]] = None
+    folder_id: Optional[str] = None
+    paper_ids: Optional[List[str]] = None
 
 class FeedbackRequest(BaseModel):
     message_id: int

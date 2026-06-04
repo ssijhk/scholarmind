@@ -1,28 +1,30 @@
 -- MySQL schema initialization for ScholarMind
+-- All primary keys use VARCHAR(64) to match Python uuid/xxhash string IDs
 
 CREATE TABLE IF NOT EXISTS users (
-  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+  id            VARCHAR(64) PRIMARY KEY,
   username      VARCHAR(64)  NOT NULL UNIQUE,
   email         VARCHAR(128) NOT NULL UNIQUE,
   password_hash VARCHAR(128) NOT NULL,            -- bcrypt
   role          VARCHAR(16)  NOT NULL DEFAULT 'user',  -- user | admin
+  is_active     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS folders (
-  id         BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id    BIGINT NOT NULL,
+  id         VARCHAR(64) PRIMARY KEY,
+  user_id    VARCHAR(64) NOT NULL,
   name       VARCHAR(128) NOT NULL,
-  parent_id  BIGINT NULL,
+  parent_id  VARCHAR(64) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_folders_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS papers (
-  id           BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id      BIGINT NOT NULL,
-  folder_id    BIGINT NULL,
+  id           VARCHAR(64) PRIMARY KEY,
+  user_id      VARCHAR(64) NOT NULL,
+  folder_id    VARCHAR(64) NULL,
   title        VARCHAR(512) NOT NULL,
   authors      JSON NULL,
   abstract     TEXT NULL,
@@ -35,17 +37,18 @@ CREATE TABLE IF NOT EXISTS papers (
   pdf_key      VARCHAR(256) NOT NULL,
   num_pages    INT NULL,
   chunk_count  INT NOT NULL DEFAULT 0,
-  status       VARCHAR(16)  NOT NULL DEFAULT 'pending', -- pending|done|failed
+  status       VARCHAR(16)  NOT NULL DEFAULT 'pending', -- pending|parsing|indexing|done|failed
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_user_filehash (user_id, file_hash),
   INDEX idx_papers_user (user_id),
   INDEX idx_papers_folder (folder_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS doc_blocks (
-  id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-  paper_id    BIGINT NOT NULL,
-  user_id     BIGINT NOT NULL,
+  id          VARCHAR(64) PRIMARY KEY,
+  paper_id    VARCHAR(64) NOT NULL,
+  user_id     VARCHAR(64) NOT NULL,
   block_type  VARCHAR(16) NOT NULL,               -- text|table|figure|formula
   content     LONGTEXT NULL,                       -- table->HTML, formula->LaTeX, figure->caption
   page_num    INT NULL,
@@ -56,19 +59,20 @@ CREATE TABLE IF NOT EXISTS doc_blocks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS citations (
-  id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-  src_paper_id  BIGINT NOT NULL,
-  dst_paper_id  BIGINT NULL,
-  dst_title     VARCHAR(512) NULL,
+  id            VARCHAR(64) PRIMARY KEY,
+  paper_id      VARCHAR(64) NOT NULL,              -- the source paper that HAS these references
+  title         VARCHAR(512) NULL,
+  authors       JSON NULL,
+  year          VARCHAR(8) NULL,
+  doi           VARCHAR(128) NULL,
   raw_ref       TEXT NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_cit_src (src_paper_id),
-  INDEX idx_cit_dst (dst_paper_id)
+  INDEX idx_cit_paper (paper_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ingest_batches (
-  id         BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id    BIGINT NOT NULL,
+  id         VARCHAR(64) PRIMARY KEY,
+  user_id    VARCHAR(64) NOT NULL,
   total      INT NOT NULL DEFAULT 0,
   done       INT NOT NULL DEFAULT 0,
   failed     INT NOT NULL DEFAULT 0,
@@ -78,10 +82,10 @@ CREATE TABLE IF NOT EXISTS ingest_batches (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ingest_tasks (
-  id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-  batch_id    BIGINT NULL,
-  user_id     BIGINT NOT NULL,
-  paper_id    BIGINT NULL,
+  id          VARCHAR(64) PRIMARY KEY,
+  batch_id    VARCHAR(64) NULL,
+  user_id     VARCHAR(64) NOT NULL,
+  paper_id    VARCHAR(64) NULL,
   file_name   VARCHAR(256) NOT NULL,
   file_hash   CHAR(16) NOT NULL,
   stage       VARCHAR(16) NOT NULL DEFAULT 'queued', -- queued|parsing|indexing|done|failed
@@ -96,9 +100,9 @@ CREATE TABLE IF NOT EXISTS ingest_tasks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS query_logs (
-  id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id            BIGINT NOT NULL,
-  conversation_id    BIGINT NULL,
+  id                 VARCHAR(64) PRIMARY KEY,
+  user_id            VARCHAR(64) NOT NULL,
+  conversation_id    VARCHAR(64) NULL,
   question           TEXT NOT NULL,
   rewritten_query    TEXT NULL,
   retrieved_chunk_ids JSON NULL,
@@ -113,8 +117,8 @@ CREATE TABLE IF NOT EXISTS query_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS access_logs (
-  id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id     BIGINT NULL,
+  id          VARCHAR(64) PRIMARY KEY,
+  user_id     VARCHAR(64) NULL,
   method      VARCHAR(8) NOT NULL,
   path        VARCHAR(256) NOT NULL,
   status_code INT NOT NULL,
