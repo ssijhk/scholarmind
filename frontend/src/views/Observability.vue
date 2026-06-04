@@ -91,15 +91,23 @@
                 </tr>
               </thead>
               <tbody>
+                <tr v-if="queryLogs.length === 0">
+                  <td colspan="6" class="empty-list" style="padding: 40px;">
+                    暂无语问检索日志。请先在「文献对话调研」中提问，系统将自动记录。
+                  </td>
+                </tr>
                 <tr v-for="log in queryLogs" :key="log.id">
                   <td class="question-text">{{ log.question }}</td>
                   <td class="rewritten-text">{{ log.rewritten_query || '无改写' }}</td>
-                  <td class="num-col">{{ log.latency_ms }} ms</td>
-                  <td class="num-col">{{ log.prompt_tokens }} / {{ log.completion_tokens }}</td>
+                  <td class="num-col">{{ log.latency_ms !== null ? log.latency_ms + ' ms' : '-' }}</td>
+                  <td class="num-col">{{ log.prompt_tokens !== null ? log.prompt_tokens + ' / ' + log.completion_tokens : '-' }}</td>
                   <td>
-                    <span v-for="cid in log.retrieved_chunk_ids" :key="cid" class="chunk-badge">
-                      #{{ cid }}
-                    </span>
+                    <template v-if="(log.retrieved_chunk_ids || []).filter(c => c).length > 0">
+                      <span v-for="cid in log.retrieved_chunk_ids.filter(c => c)" :key="cid" class="chunk-badge">
+                        #{{ cid }}
+                      </span>
+                    </template>
+                    <span v-else class="fb-tag none">-</span>
                   </td>
                   <td>
                     <span v-if="log.feedback === 1" class="fb-tag up">👍 赞</span>
@@ -127,7 +135,7 @@ const authStore = useAuthStore();
 
 interface Stats { paper_count: number; chunk_count: number; total_queries: number; average_latency_ms: number }
 interface Task { id: string; file_name: string; stage: string; progress: number; error_msg: string | null; started_at: string | null }
-interface QueryLog { id: number; question: string; rewritten_query: string | null; latency_ms: number | null; prompt_tokens: number | null; completion_tokens: number | null; retrieved_chunk_ids: number[] | null; feedback: number | null }
+interface QueryLog { id: string; question: string; rewritten_query: string | null; latency_ms: number | null; prompt_tokens: number | null; completion_tokens: number | null; retrieved_chunk_ids: string[] | null; feedback: number | null }
 
 const stats = ref<Stats>({ paper_count: 0, chunk_count: 0, total_queries: 0, average_latency_ms: 0 });
 const activeTasks = ref<Task[]>([]);
@@ -139,9 +147,9 @@ const stageMap: Record<string, string> = {
 };
 
 onMounted(async () => {
-  try { const r = await api.get('/api/stats/overview'); stats.value = r.data; } catch {}
-  try { const r = await api.get('/api/tasks'); activeTasks.value = r.data; } catch {}
-  try { const r = await api.get('/api/logs/queries'); queryLogs.value = r.data; } catch {}
+  try { const r = await api.get('/api/stats/overview'); stats.value = r.data; } catch (e) { console.error('stats/overview error:', e) }
+  try { const r = await api.get('/api/tasks'); activeTasks.value = r.data; } catch (e) { console.error('tasks error:', e) }
+  try { const r = await api.get('/api/logs/queries'); queryLogs.value = r.data; } catch (e) { console.error('logs/queries error:', e) }
 });
 
 function handleLogout() {

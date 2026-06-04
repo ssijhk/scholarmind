@@ -10,7 +10,7 @@ class QueryLogResponse(BaseModel):
     latency_ms: Optional[int] = None
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
-    retrieved_chunk_ids: Optional[List[int]] = None
+    retrieved_chunk_ids: Optional[List[str]] = None
     feedback: Optional[int] = None
     created_at: Optional[datetime] = None
 

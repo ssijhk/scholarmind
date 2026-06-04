@@ -193,7 +193,7 @@ async def chat_query(request: ChatQueryRequest, user_id: str = Depends(get_curre
                             "cid": request.conversation_id or "",
                             "q": request.question,
                             "rw": query_text if query_text != request.question else None,
-                            "chunks": json.dumps([ch.get("chunk_id", "") for ch in chunks] if chunks else []),
+                            "chunks": json.dumps([ch.get("id", "") for ch in chunks] if chunks else []),
                             "tk": len(chunks),
                             "lat": latency_ms,
                             "pt": prompt_tokens, "ct": completion_tokens,

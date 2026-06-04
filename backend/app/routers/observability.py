@@ -16,10 +16,15 @@ def _parse_json_list(val) -> list:
     if val is None:
         return []
     if isinstance(val, list):
-        return val
+        return [str(v) for v in val]
     if isinstance(val, str):
+        if not val.strip():
+            return []
         try:
-            return json.loads(val)
+            parsed = json.loads(val)
+            if isinstance(parsed, list):
+                return [str(v) for v in parsed]
+            return []
         except (json.JSONDecodeError, TypeError):
             return []
     return []
